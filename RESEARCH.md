@@ -148,6 +148,7 @@ Orbis OS is derived from FreeBSD 9 with proprietary Sony subsystem additions. Re
 
 * **September 16, 2026:** Sony publishes **PS4 Firmware 14.00**. Userland WebKit vulnerabilities remain exploitable with updated gadget offsets.
 * **October 1, 2026:** Sony deploys emergency update **Firmware 14.10** across the PlayStation ecosystem, specifically targeting public developments around the *Relapse* AIO chain and *Byepervisor Reborn* hypervisor bypass. Mandatory update enforcement was instituted by cutting PlayStation Network (PSN) connectivity for consoles on earlier revisions.
+* **Cross-Platform PS5 Repository:** Detailed architectural analysis of FreeBSD vectors applied to Prospero OS (PS5) and hypervisor bridge specifications are documented at [adri22235/ps5-security-research](https://github.com/adri22235/ps5-security-research).
 * **Research Recommendation:** Consoles targeting homebrew or security verification on Firmware 14.00 must remain strictly offline to prevent unwanted automatic updating to 14.10+.
 
 ---
