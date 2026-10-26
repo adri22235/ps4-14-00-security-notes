@@ -4,17 +4,16 @@ Public, source-linked notes on vulnerabilities and security changes relevant to 
 
 ## Current assessment
 
-As checked on 2026-10-26, public community references do not list a complete public jailbreak chain for firmware 14.00. That does not mean the firmware has no vulnerabilities. The strongest published leads and caveats are summarized below:
+Snapshot: 2026-10-26. The research repository [ps4-13xx-research](https://github.com/adri22235/ps4-13xx-research) reports a set of FreeBSD-derived kernel candidates and FW 14.00 WebKit/kernel data. These are leads, not validated 14.00 kernel exploits.
 
-| Area | What public sources say | Confidence |
+| Area | Current evidence | Confidence / caveat |
 | --- | --- | --- |
-| WebKit / Slopkit | The Slopkit chain works through 13.52. PS4 Dev Wiki marks it at least partially patched in 14.00; a port to 14.00 is not established by that status page. | Moderate; community-maintained, underlying analysis incomplete |
-| AIO kernel bug (“relapse”) | PS4 Dev Wiki lists the public PS4 implementation through 13.52 and says it may be patched in 14.00. | Tentative for the 14.00 patch status |
-| mast1c0re / LuaC0re | PS4 Dev Wiki says the PS2 emulator path remains unpatched as of PS4 14.00. This is user-mode research and is not, by itself, a kernel jailbreak. | Moderate; community-maintained status |
-| Non-AF_UNIX sockets | PS4 Dev Wiki reports that since 14.00, non-privileged PS4 games cannot create non-AF_UNIX domain sockets. It notes the Internet Browser privilege question needs testing. | Reported behavior; scope caveat remains |
-| Complete jailbreak | ConsoleMods’ exploit chart reports no public userland or kernel exploit for 14.00 or newer. | Community status snapshot; may change |
+| FreeBSD-derived KEX candidates | Source repo flags CVE-2026-7270 (`execve`) and CVE-2026-101308 (`sound(4)`) among others. | Upstream bugs are documented; presence, reachability and impact in Sony's FreeBSD 9-derived Orbis kernel are unconfirmed. |
+| WebKit gadget offsets | Source repo reports a +0x4000 delta for a sample of gadgets between 13.50 and 14.00 and lists 27 gadget entries in its JS file. | Researcher-reported. The decrypted SPRX and a reproducible analysis artifact are not included in the referenced files, so this repo has not independently verified them. |
+| Kernel data offsets | Source repo reports PRISON0 `0x0111FA18`, ROOTVNODE `0x02136E90`, ALLPROC `0x01B28538`. | Reported from Al-Azif / Scene-Collective material; not independently checked against a 14.00 kernel image here. |
+| Complete jailbreak | ConsoleMods’ exploit chart reports no public userland or kernel exploit for 14.00 or newer. | Community status snapshot; may change. |
 
-These findings describe public knowledge, not a claim that firmware 14.00 is secure. The status can change as researchers publish validated results.
+A CVE that affects current upstream FreeBSD does not automatically affect Orbis: Sony uses a substantially older, modified kernel base, and the vulnerable code, device node, syscall exposure and relevant fixes must each be checked in the firmware-specific build.
 
 ## Research notes
 
@@ -23,7 +22,7 @@ These findings describe public knowledge, not a claim that firmware 14.00 is sec
 
 ## Scope
 
-This repository is a literature review and tracking index. It does not include exploit payloads, console-targeting instructions, leaked firmware, or claims of original discovery. Please submit corrections with primary evidence, affected firmware versions, test conditions, and reproducible observations that do not expose private user data.
+This repository is a source-based research index. Technical offsets and gadget addresses are included as researcher-reported data, with provenance and validation limits stated. No claim is made that they constitute a working exploit chain. Please submit corrections with primary evidence, affected firmware versions, test conditions and reproducible observations that do not expose private user data.
 
 ## Contributing
 
