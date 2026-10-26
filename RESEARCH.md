@@ -3,7 +3,7 @@
 **Snapshot date:** 2026-10-26  
 **Scope:** Publicly documented PS4 firmware vulnerabilities and research leads relevant to 14.00.  
 **Source repo:** [adri22235/ps4-13xx-research](https://github.com/adri22235/ps4-13xx-research)  
-**Method:** Review its README, `vuln_research_1400.md`, `webkit_1400_analysis.md`, and `webkit_gadgets_1400.js`; cross-check upstream FreeBSD CVEs against FreeBSD advisories. No PS4 firmware image or console test was available for independent validation.
+**Method:** Review its README, `vuln_research_1400.md`, `webkit_1400_analysis.md`, `webkit_gadgets_1400.js`, scanner script and test inventory; cross-check upstream FreeBSD CVEs against FreeBSD advisories. No decrypted WebKit module or PS4 console test was available for independent validation.
 
 ## Summary
 
@@ -13,7 +13,7 @@ The two requested FreeBSD examples need particular care:
 
 - **CVE-2026-7270 (`execve`)** is a real upstream FreeBSD local privilege-escalation issue. FreeBSD's advisory says “all supported versions” and lists fixes for stable/releng 13.5, 14.3/14.4 and 15.0. It does not establish vulnerability in FreeBSD 9 or Sony's fork. The claim in the source repo that it is present in the FreeBSD 9 base needs code-level evidence; an upstream version label or CVE alone is insufficient.
 - **CVE-2026-101308 (`sound(4)`)** is a real upstream race involving sound-buffer resize and `mmap`. The published FreeBSD affected-release list covers 14.4, 14.5 and 15.1 release branches. It does not establish that the same implementation or vulnerable path exists in Orbis. PS4 applicability also depends on the driver/device and permissions being present and reachable.
-- **WebKit analysis:** the source repo reports a constant +0x4000 difference for eight sample gadget offsets between 13.50 and 14.00. This is a set of relative code offsets, not proof that the entire binary has a single base shift. The file `libSceNKWebKit.sprx.decrypted` itself is not included in the fetched source files, so these values are attributed to the source authors rather than independently verified here.
+- **WebKit analysis:** the source repo reports a constant +0x4000 difference for eight sample gadget offsets between 13.50 and 14.00. This is a set of relative code offsets, not proof that the entire binary has a single base shift. The scanner script and ROP dispatcher test are present in the source repo, but `libSceNKWebKit.sprx.decrypted` is not. The values are attributed to the source authors; without the target module they could not be independently reproduced here. The listed test checks the dispatcher, not whether each byte pattern occurs in the right firmware binary.
 - **Kernel offsets:** PRISON0, ROOTVNODE and ALLPROC below are copied as reported values. The source README attributes 14.00 kernel offsets to Al-Azif / Scene-Collective, but the referenced `1400_offsets.txt` was not present at the repository root when checked. Treat them as unverified until matched against an authenticated 14.00 kernel image.
 
 ## FreeBSD-derived kernel candidate catalogue
@@ -30,9 +30,9 @@ The entries below are leads collected in `vuln_research_1400.md`, not demonstrat
 | [CVE-2026-58094](https://security.freebsd.org/advisories/FreeBSD-SA-26:63.posixshm.asc) | POSIX shared memory; synchronization/TOCTOU. | Candidate in source repo; affected facility and PS4 code unverified. |
 | [CVE-2026-45251](https://security.freebsd.org/advisories/FreeBSD-SA-26:19.file.asc) | `poll(2)`/`select(2)`; descriptor lifecycle race/UAF. | Candidate in source repo; PS4 code and reachability unverified. |
 | [CVE-2026-101307](https://security.freebsd.org/advisories/FreeBSD-SA-26:70.tcp.asc) | TCP RACK PCM integer overflow. | Conditional lead in source repo; whether the relevant module/code exists and is enabled in Orbis is unknown. |
-| FreeBSD-SA-26:55.elf | ELF core-dump heap overflow (as named in source repo). | Candidate only; configuration and vulnerable code presence unverified. |
+| [FreeBSD-SA-26:55.elf](https://security.freebsd.org/advisories/FreeBSD-SA-26:55.elf.asc) | ELF core-dump heap overflow (as named in source repo). | Candidate only; configuration and vulnerable code presence unverified. |
 | CVE-2026-49415 | `execve` SUID/TOCTOU race (as described in source repo). | Candidate only; source repo notes SUID target availability as a constraint. Orbis applicability unverified. |
-| FreeBSD-SA-26:63.posixshm and other source-repo leads | Additional kernel paths listed in the source report. | Do not treat any as a PS4 vulnerability without firmware-specific code evidence. |
+
 
 The source report also contains detailed mechanisms and proposed exploitation paths. This summary intentionally records candidate identity and validation status only; it does not reproduce trigger sequences or exploit instructions.
 
