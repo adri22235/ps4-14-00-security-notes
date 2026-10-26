@@ -118,3 +118,27 @@ These are community-maintained status snapshots and can change.
 ## Limitations
 
 This is a source audit, not an independent console test. The main PS4 details are researcher-reported by the linked repository. Upstream CVE validity must not be confused with applicability to Sony's older, modified kernel. The source repository contains inconsistent metadata (including SYSENT addresses and the claimed gadget verification count); conflicts are called out rather than silently resolved.
+
+
+## 14.00 exploit architecture (conceptual; not validated)
+
+The following diagram records the research hypothesis and the evidence gates. It is not a working chain. No WebKit-to-kernel path has been demonstrated here on firmware 14.00, and the FreeBSD-derived candidates below remain subject to firmware-specific review and hardware verification.
+
+```mermaid
+flowchart LR
+    A["Phase 1 — Userland: PS4 browser / WebKit"] -->|requires a reproducible 14.00 memory-safety primitive| B["Userland control-flow capability"]
+    B -->|requires independent validation; no ROP chain specified| C{"Phase 2 — Candidate kernel entry"}
+    C -->|sound(4): resize/mmap race; driver and device access unverified| D["CVE-2026-101308 candidate"]
+    C -->|execve: argument-processing path; Orbis code presence unverified| E["CVE-2026-7270 candidate"]
+    D -->|requires matching vulnerable code and safe lab validation| F["Kernel privilege boundary"]
+    E -->|requires matching vulnerable code and safe lab validation| F
+    F -->|GoldHEN kpayload compatibility must be established for FW 14.00| G["Phase 3 — Post-exploitation research"]
+    G --> H["Documented kernel structures and supported payload behavior"]
+```
+
+### Phase boundaries and status
+
+1. **Userland / WebKit:** The source repository reports candidate memory-corruption work and gadget offsets. Treat the 14.00 entry primitive and any control-flow transfer as unverified until reproduced against a legally obtained 14.00 dump and tested on hardware.
+2. **Kernel candidates:** `sound(4)` and `execve` are distinct upstream vulnerability paths, not interchangeable syscall targets. Their affected upstream FreeBSD releases do not establish that the vulnerable code exists or is reachable in Orbis. No dispatcher layout or call sequence is asserted here.
+3. **GoldHEN kpayload:** The offsets listed above are source-reported symbol locations. Their interpretation, firmware match, and compatibility with a 14.00 payload need independent confirmation. This document does not assert that jail or credential changes have been achieved on 14.00.
+
