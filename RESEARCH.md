@@ -120,25 +120,26 @@ These are community-maintained status snapshots and can change.
 This is a source audit, not an independent console test. The main PS4 details are researcher-reported by the linked repository. Upstream CVE validity must not be confused with applicability to Sony's older, modified kernel. The source repository contains inconsistent metadata (including SYSENT addresses and the claimed gadget verification count); conflicts are called out rather than silently resolved.
 
 
-## 14.00 exploit architecture (conceptual; not validated)
+## 14.00 exploit architecture (proposed; not validated)
 
-The following diagram records the research hypothesis and the evidence gates. It is not a working chain. No WebKit-to-kernel path has been demonstrated here on firmware 14.00, and the FreeBSD-derived candidates below remain subject to firmware-specific review and hardware verification.
+The diagram records the proposed three-stage architecture reported for research. It does not claim a working FW 14.00 chain: the WebKit primitive, dispatcher behavior, kernel-candidate applicability, and payload compatibility still require firmware-specific verification and hardware testing.
 
 ```mermaid
 flowchart LR
-    A["Phase 1 — Userland: PS4 browser / WebKit"] -->|requires a reproducible 14.00 memory-safety primitive| B["Userland control-flow capability"]
-    B -->|requires independent validation; no ROP chain specified| C{"Phase 2 — Candidate kernel entry"}
-    C -->|sound(4): resize/mmap race; driver and device access unverified| D["CVE-2026-101308 candidate"]
-    C -->|execve: argument-processing path; Orbis code presence unverified| E["CVE-2026-7270 candidate"]
-    D -->|requires matching vulnerable code and safe lab validation| F["Kernel privilege boundary"]
-    E -->|requires matching vulnerable code and safe lab validation| F
-    F -->|GoldHEN kpayload compatibility must be established for FW 14.00| G["Phase 3 — Post-exploitation research"]
-    G --> H["Documented kernel structures and supported payload behavior"]
+    A["Phase 1 — Userland: WebKit memory corruption / heap spray (reported hypothesis)"] --> B["Stack pivot: gadget offset 0x03F755A8 (reported; verify module-relative convention)"]
+    B --> C["Phase 2 — ROP dispatcher: proposed 10 qwords / 80 bytes"]
+    C --> D{"Candidate kernel path; separate activation semantics"}
+    D -->|sound(4): buffer resize / mmap race| E["CVE-2026-101308"]
+    D -->|execve: argument-processing overflow| F["CVE-2026-7270"]
+    E --> G["Phase 3 — Kernel / GoldHEN kpayload"]
+    F --> G
+    G --> H["Reported offsets: PRISON0 0x0111FA18; ROOTVNODE 0x02136E90"]
+    H --> I["Jail / credential effects and FW 14.00 payload compatibility require hardware validation"]
 ```
 
 ### Phase boundaries and status
 
-1. **Userland / WebKit:** The source repository reports candidate memory-corruption work and gadget offsets. Treat the 14.00 entry primitive and any control-flow transfer as unverified until reproduced against a legally obtained 14.00 dump and tested on hardware.
-2. **Kernel candidates:** `sound(4)` and `execve` are distinct upstream vulnerability paths, not interchangeable syscall targets. Their affected upstream FreeBSD releases do not establish that the vulnerable code exists or is reachable in Orbis. No dispatcher layout or call sequence is asserted here.
-3. **GoldHEN kpayload:** The offsets listed above are source-reported symbol locations. Their interpretation, firmware match, and compatibility with a 14.00 payload need independent confirmation. This document does not assert that jail or credential changes have been achieved on 14.00.
+1. **Userland / WebKit:** Heap spraying, memory corruption, and the pivot at `0x03F755A8` are source-reported design elements, not independently reproduced in this repository. Confirm the gadget's module-relative address against the legally obtained FW 14.00 dump.
+2. **ROP dispatcher:** The proposed dispatcher size is 10 qwords (80 bytes). This document records the proposed size and stage boundary only; it does not supply qword values or assert the dispatcher has been demonstrated. The `sound(4)` and `execve` candidates have different activation paths and must not be treated as interchangeable syscall targets.
+3. **Kernel / GoldHEN kpayload:** PRISON0 and ROOTVNODE are reported offsets in the scene's GoldHEN kpayload format. Any jail or credential effects, the ALLPROC mapping listed above, and compatibility with FW 14.00 remain subject to validation against the target kernel and on hardware.
 
