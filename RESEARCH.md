@@ -143,3 +143,33 @@ flowchart LR
 2. **ROP dispatcher:** The proposed dispatcher size is 10 qwords (80 bytes). This document records the proposed size and stage boundary only; it does not supply qword values or assert the dispatcher has been demonstrated. The `sound(4)` and `execve` candidates have different activation paths and must not be treated as interchangeable syscall targets.
 3. **Kernel / GoldHEN kpayload:** PRISON0 and ROOTVNODE are reported offsets in the scene's GoldHEN kpayload format. Any jail or credential effects, the ALLPROC mapping listed above, and compatibility with FW 14.00 remain subject to validation against the target kernel and on hardware.
 
+
+
+## Dispatcher Frame from `test_rop_dispatcher_1400.c`
+
+This section describes the frame builder in the source repository as written. It is a structural test using a fake WebKit base and placeholder pointers; it does not demonstrate a live syscall or a working FW 14.00 exploit.
+
+The function emits ten 64-bit words (80 bytes). Each gadget word is computed as `webkit_base + offset`; each following word is an immediate argument value.
+
+| Qword index | Frame entry | Intended register/effect | Source-reported gadget offset |
+| ---: | --- | --- | ---: |
+| 0 | `base + POP_RDI_RET` | Load argument 1 into RDI | `0x00060480` |
+| 1 | `arg1` | Value consumed by `pop rdi` | — |
+| 2 | `base + POP_RSI_RET` | Load argument 2 into RSI | `0x0007245E` |
+| 3 | `arg2` | Value consumed by `pop rsi` | — |
+| 4 | `base + POP_RDX_RET` | Load argument 3 into RDX | `0x001305BA` |
+| 5 | `arg3` | Value consumed by `pop rdx` | — |
+| 6 | `base + POP_RCX_RET` | Load the test's fourth value into RCX | `0x0001FADE` |
+| 7 | `arg4` | Value consumed by `pop rcx` | — |
+| 8 | `base + POP_RAX_RET` | Load the syscall number into RAX | `0x00014504` |
+| 9 | `syscall_num` | Value consumed by `pop rax` | — |
+
+### ABI and verification limits
+
+- The register assignment above is what the test harness constructs. It corresponds to the first four integer arguments of a System V AMD64 **function call**, plus the test's syscall-number slot in RAX.
+- It is not a correct native FreeBSD x86-64 syscall frame as written: the kernel ABI uses RDI, RSI, RDX, **R10**, R8 and R9 for syscall arguments; RCX is clobbered by the `syscall` instruction. The scanner searches for a `POP_R10_RET` pattern, but the published gadget map and this test do not provide/use a verified R10 slot.
+- The test checks `(chain.count * 8) % 16 == 0`. Ten qwords give 80 bytes, and `80 % 16 == 0`; this proves only that the frame length is a multiple of 16. It does not establish the actual RSP alignment at a call/syscall boundary, which also depends on the pivot address and intervening `ret`/pop effects. The test prints the pivot address but does not add it to the frame or simulate the pivot.
+- The frame builder does not append or execute a `syscall; ret` gadget. The scanner defines a search pattern for that instruction sequence, but the checked-in gadget map does not publish its offset. Therefore the test verifies assembly/counting of a frame layout, not syscall dispatch.
+- The offsets above are copied from the source test and gadget map. Reproduction still requires the correct, lawfully obtained FW 14.00 dump and validation of the module-relative address convention.
+
+Sources: [test_rop_dispatcher_1400.c](https://github.com/adri22235/ps4-13xx-research/blob/main/tests/test_rop_dispatcher_1400.c), [test_rop_dispatcher.js](https://github.com/adri22235/ps4-13xx-research/blob/main/tests/test_rop_dispatcher.js), [webkit_gadgets_1400.js](https://github.com/adri22235/ps4-13xx-research/blob/main/webkit_gadgets_1400.js), [gadget scanner](https://github.com/adri22235/ps4-13xx-research/blob/main/scripts/find_webkit_gadgets_1400.py), [FreeBSD amd64 ABI reference](https://people.freebsd.org/~obrien/amd64-elf-abi.pdf).
