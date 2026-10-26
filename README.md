@@ -9,7 +9,7 @@ Snapshot: 2026-10-26. The research repository [ps4-13xx-research](https://github
 | Area | Current evidence | Confidence / caveat |
 | --- | --- | --- |
 | FreeBSD-derived KEX candidates | Source repo flags CVE-2026-7270 (`execve`) and CVE-2026-101308 (`sound(4)`) among others. | Upstream bugs are documented; presence, reachability and impact in Sony's FreeBSD 9-derived Orbis kernel are unconfirmed. |
-| WebKit gadget offsets | Source repo reports a +0x4000 delta for a sample of gadgets between 13.50 and 14.00 and lists 27 gadget entries in its JS file. | Researcher-reported. The decrypted SPRX and a reproducible analysis artifact are not included in the referenced files, so this repo has not independently verified them. |
+| WebKit gadget offsets | Source repo reports a +0x4000 delta for a sample of gadgets between 13.50 and 14.00 and lists 29 named gadget entries (including compound gadgets) in its JS file. | Researcher-reported. The decrypted SPRX and a reproducible analysis artifact are not included in the referenced files, so this repo has not independently verified them. |
 | Kernel data offsets | Source repo reports PRISON0 `0x0111FA18`, ROOTVNODE `0x02136E90`, ALLPROC `0x01B28538`. | Reported from Al-Azif / Scene-Collective material; not independently checked against a 14.00 kernel image here. |
 | Complete jailbreak | ConsoleMods’ exploit chart reports no public userland or kernel exploit for 14.00 or newer. | Community status snapshot; may change. |
 
