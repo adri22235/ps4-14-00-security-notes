@@ -8,9 +8,9 @@ Snapshot: 2026-10-26. The research repository [ps4-13xx-research](https://github
 
 | Area | Current evidence | Confidence / caveat |
 | --- | --- | --- |
-| FreeBSD-derived KEX candidates | Source repo flags CVE-2026-7270 (`execve`) and CVE-2026-101308 (`sound(4)`) among others. | Upstream bugs are documented; presence, reachability and impact in Sony's FreeBSD 9-derived Orbis kernel are unconfirmed. |
-| WebKit gadget offsets | Source repo reports a +0x4000 delta for a sample of gadgets between 13.50 and 14.00 and lists 29 named gadget entries (including compound gadgets) in its JS file. | Researcher-reported. The source repo includes a scanner and dispatcher test, but not the decrypted SPRX needed to reproduce the binary findings; this repo has not independently verified them. |
-| Kernel data offsets | Source repo reports PRISON0 `0x0111FA18`, ROOTVNODE `0x02136E90`, ALLPROC `0x01B28538`. | Reported from Al-Azif / Scene-Collective material; not independently checked against a 14.00 kernel image here. |
+| FreeBSD-derived KEX candidates | CVE-2026-7270 (`execve`) and CVE-2026-101308 (`sound(4)`) are priority candidates for static and dynamic analysis. | Hardware verification remains pending; upstream advisories do not establish presence or reachability in Orbis. |
+| WebKit gadget offsets | Source repo reports a +0x4000 delta for a sample of gadgets between 13.50 and 14.00 and lists 29 named gadget entries (including compound gadgets) in its JS file. | Researcher-reported. The source repo includes `scripts/find_webkit_gadgets_1400.py`; analysis is reproducible using a legally obtained firmware dump. The proprietary SPRX is not hosted for copyright/DMCA compliance, and this repo has not run the extraction. |
+| Kernel data offsets | Source repo reports PRISON0 `0x0111FA18`, ROOTVNODE `0x02136E90`, ALLPROC `0x01B28538`. | Reported in the GoldHEN kpayload offset format documented by the scene: PRISON0 (prison/credential context), ROOTVNODE (root vnode), ALLPROC (process list). Target-image verification remains pending. |
 | Complete jailbreak | ConsoleMods’ exploit chart reports no public userland or kernel exploit for 14.00 or newer. | Community status snapshot; may change. |
 
 A CVE that affects current upstream FreeBSD does not automatically affect Orbis: Sony uses a substantially older, modified kernel base, and the vulnerable code, device node, syscall exposure and relevant fixes must each be checked in the firmware-specific build.
