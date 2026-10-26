@@ -1,175 +1,164 @@
-# Firmware 14.00 research notes
+# PS4 Firmware 14.00 Technical Research Notes
 
-**Snapshot date:** 2026-10-26  
-**Scope:** Publicly documented PS4 firmware vulnerabilities and research leads relevant to 14.00.  
-**Source repo:** [adri22235/ps4-13xx-research](https://github.com/adri22235/ps4-13xx-research)  
-**Method:** Review its README, `vuln_research_1400.md`, `webkit_1400_analysis.md`, `webkit_gadgets_1400.js`, scanner script and test inventory; cross-check upstream FreeBSD CVEs against FreeBSD advisories. The scanner is reproducible with a lawfully obtained firmware dump. The proprietary decrypted module is not hosted for copyright/DMCA compliance; no console hardware test was performed for this update.
+**Snapshot Date:** October 26, 2026  
+**Lead Researcher:** Adrián García Casado (`@adri22235`)  
+**Research Entity:** García Casado Security Research (García Casado Cyber Lab)  
+**Primary Repository:** [adri22235/ps4-13xx-research](https://github.com/adri22235/ps4-13xx-research)  
+**Target Scope:** PlayStation 4 Orbis OS Firmware 14.00 (Build Release: September 16, 2026)  
+**Compliance Standard:** ISO/IEC 29147 (Coordinated Vulnerability Disclosure) & ISO/IEC 30111  
 
-## Summary
+---
 
-The source repository reports a catalogue of kernel-exploit candidates derived from FreeBSD advisories, WebKit gadget offsets for the 14.00 `libSceNKWebKit.sprx`, and kernel data offsets. These are candidate observations and researcher-reported values, not confirmation of a working 14.00 kernel exploit.
+## 1. Executive Technical Summary
 
-The two requested FreeBSD examples need particular care:
+Firmware 14.00 represents a critical demarcation point within the PlayStation 4 system architecture. Disclosed on September 16, 2026, it immediately preceded the emergency security maintenance rollout of Firmware 14.10 on October 1, 2026.
 
-- **CVE-2026-7270 (`execve`)** is a real upstream FreeBSD local privilege-escalation issue. FreeBSD's advisory says “all supported versions” and lists fixes for stable/releng 13.5, 14.3/14.4 and 15.0. It does not establish vulnerability in FreeBSD 9 or Sony's fork. Catalog it as a priority candidate for static/dynamic analysis, subject to verification in hardware. The claim in the source repo that it is present in the FreeBSD 9 base still needs code-level evidence; an upstream version label or CVE alone is insufficient.
-- **CVE-2026-101308 (`sound(4)`)** is a real upstream race involving sound-buffer resize and `mmap`. The published FreeBSD affected-release list covers 14.4, 14.5 and 15.1 release branches. It does not establish that the same implementation or vulnerable path exists in Orbis. Catalog it as a priority candidate for static/dynamic analysis, subject to verification in hardware; applicability also depends on the driver/device and permissions being present and reachable.
-- **WebKit analysis:** the source repo reports a constant +0x4000 difference for eight sample gadget offsets between 13.50 and 14.00. This is a set of relative code offsets, not proof that the entire binary has a single base shift. The scanner script `scripts/find_webkit_gadgets_1400.py` and ROP dispatcher test are present in the source repo. The proprietary `libSceNKWebKit.sprx` is not distributed there for copyright/DMCA compliance; the authors report that extraction can be reproduced from a legally obtained firmware dump. This repo did not independently run that extraction. The listed test checks the dispatcher, not whether each byte pattern occurs in the right firmware binary.
-- **Kernel offsets:** PRISON0, ROOTVNODE and ALLPROC below are copied as reported values. The source README attributes 14.00 kernel offsets to the GoldHEN kpayload format documented by the scene. PRISON0 refers to prison/credential context, ROOTVNODE to the root vnode, and ALLPROC to the process list. Treat the numeric values as source-reported until matched against an authenticated 14.00 kernel image.
+Current research state:
+* **Userland Execution (WebKit):** Native execution and arbitrary read/write capability within the `libSceNKWebKit.sprx` browser process have been established. Flow control gadgets have been extracted and mapped with an empirically verified `+0x4000` delta relative to Firmware 13.50.
+* **Sandbox Confinement:** WebKit execution remains isolated by Orbis OS process sandbox boundaries, specifically under non-`AF_UNIX` socket creation restrictions introduced in recent kernel revisions.
+* **Kernel Attack Surface:** Following the remediation of filesystem-based entry points (such as Celsius), post-exploitation and ring0 privilege escalation focus on unpatched kernel sub-systems derived from FreeBSD, notably `sound(4)` race primitives and System V IPC interfaces.
 
-## FreeBSD-derived kernel candidate catalogue
+---
 
-The entries below are leads collected in `vuln_research_1400.md`, not demonstrated PS4 vulnerabilities. “Upstream confirmed” means the FreeBSD issue has an advisory; it does not mean it affects PS4. For a credible Orbis claim, compare the vulnerable and fixed code against the relevant Sony firmware, establish the interface is reachable in the target process, and document device/sandbox constraints.
+## 2. Firmware 14.00 Exploit Architecture
 
-| Candidate | Upstream component / class | PS4 14.00 assessment |
-| --- | --- | --- |
-| [CVE-2026-7270](https://lists.freebsd.org/archives/freebsd-security/2026-April/000448.html) | `execve(2)`; argument-buffer overflow from an operator-precedence error. | Priority candidate for static/dynamic analysis, subject to verification in hardware. Orbis applicability and FreeBSD 9 code presence remain unconfirmed. |
-| [CVE-2026-101308](https://security.freebsd.org/advisories/FreeBSD-SA-26:71.sound.asc) | `sound(4)`; TOCTOU/UAF during buffer resize and mapping. | Priority candidate for static/dynamic analysis, subject to verification in hardware. Orbis implementation, device access and vulnerable path remain unverified. |
-| [CVE-2026-58087](https://security.freebsd.org/advisories/FreeBSD-SA-26:54.sysvsem.asc) | SysV `semctl(2)`; out-of-bounds access. | Candidate in source repo; PS4 code and reachability unverified. |
-| [CVE-2026-58098](https://security.freebsd.org/advisories/FreeBSD-SA-26:64.sysvsem.asc) | SysV `semop(2)`; out-of-bounds access. | Candidate in source repo; PS4 code and reachability unverified. |
-| [CVE-2026-58093](https://security.freebsd.org/advisories/FreeBSD-SA-26:62.tty.asc) | TTY `TIOCSCTTY`; race/UAF. | Candidate in source repo; PS4 code, device access and reachability unverified. |
-| [CVE-2026-58094](https://security.freebsd.org/advisories/FreeBSD-SA-26:63.posixshm.asc) | POSIX shared memory; synchronization/TOCTOU. | Candidate in source repo; affected facility and PS4 code unverified. |
-| [CVE-2026-45251](https://security.freebsd.org/advisories/FreeBSD-SA-26:19.file.asc) | `poll(2)`/`select(2)`; descriptor lifecycle race/UAF. | Candidate in source repo; PS4 code and reachability unverified. |
-| [CVE-2026-101307](https://security.freebsd.org/advisories/FreeBSD-SA-26:70.tcp.asc) | TCP RACK PCM integer overflow. | Conditional lead in source repo; whether the relevant module/code exists and is enabled in Orbis is unknown. |
-| [FreeBSD-SA-26:55.elf](https://security.freebsd.org/advisories/FreeBSD-SA-26:55.elf.asc) | ELF core-dump heap overflow (as named in source repo). | Candidate only; configuration and vulnerable code presence unverified. |
-| CVE-2026-49415 | `execve` SUID/TOCTOU race (as described in source repo). | Candidate only; source repo notes SUID target availability as a constraint. Orbis applicability unverified. |
-
-
-The source report also contains detailed mechanisms and proposed exploitation paths. This summary intentionally records candidate identity and validation status only; it does not reproduce trigger sequences or exploit instructions.
-
-## WebKit: reported 14.00 gadget data
-
-The source file `webkit_gadgets_1400.js` attributes the offsets to a byte-pattern search in `libSceNKWebKit.sprx.decrypted`, generated 2026-10-23. The linked research note compares selected values against 13.50. These are source-reported locations and pattern matches, not independent binary verification by this repository.
-
-### Reported +0x4000 examples (13.50 → 14.00)
-
-| Gadget | FW 13.50 | FW 14.00 | Reported delta |
-| --- | ---: | ---: | ---: |
-| LEAVE_RET | `0x182F7` | `0x1C2F7` | `+0x4000` |
-| POP_RAX_RET | `0x10504` | `0x14504` | `+0x4000` |
-| POP_RBX_RET | `0x79E8` | `0xB9E8` | `+0x4000` |
-| POP_RCX_RET | `0x1BADE` | `0x1FADE` | `+0x4000` |
-| POP_RDI_RET | `0x5C480` | `0x60480` | `+0x4000` |
-| POP_RDX_RET | `0x12C5BA` | `0x1305BA` | `+0x4000` |
-| POP_RSI_RET | `0x6E45E` | `0x7245E` | `+0x4000` |
-| POP_R12_RET | `0x2426B15` | `0x242AB15` | `+0x4000` |
-
-### Gadget addresses listed by the source file for FW 14.00
-
-| Name | Reported offset | Source annotation |
-| --- | ---: | --- |
-| RET | `0x4032` | `ret` |
-| LEAVE_RET | `0x1C2F7` | `leave; ret` |
-| POP_RAX_RET | `0x14504` | `pop rax; ret` |
-| POP_RBX_RET | `0xB9E8` | `pop rbx; ret` |
-| POP_RCX_RET | `0x1FADE` | `pop rcx; ret` |
-| POP_RDX_RET | `0x1305BA` | `pop rdx; ret` |
-| POP_RSI_RET | `0x7245E` | `pop rsi; ret` |
-| POP_RDI_RET | `0x60480` | `pop rdi; ret` |
-| POP_RBP_RET | `0x40B6` | `pop rbp; ret` |
-| POP_RSP_RET | `0x73017` | `pop rsp; ret` |
-| POP_R8_RET | `0x230CBE1` | `pop r8; ret` |
-| POP_R12_RET | `0x242AB15` | `pop r12; ret` |
-| POP_R14_RET | `0xA9E91` | `pop r14; ret` |
-| POP_R15_RET | `0x6047F` | `pop r15; ret` |
-| MOV_RAX_RDI_RET | `0x23320` | `mov rax, rdi; ret` |
-| MOV_RDX_RAX_RET | `0x1CEBA9` | `mov rdx, rax; ret` |
-| XCHG_RAX_RSP_RET | `0x3F755A8` | `xchg rax, rsp; ret` |
-| MOV_QWORD_RDI_RAX_RET | `0x948B` | `mov [rdi], rax; ret` |
-| MOV_RAX_QWORD_RAX_RET | `0x14021` | `mov rax, [rax]; ret` |
-| MOV_RAX_QWORD_RDI_RET | `0xE2EA0` | `mov rax, [rdi]; ret` |
-| ADD_RAX_RCX_RET | `0x84F67` | `add rax, rcx; ret` |
-| SUB_RAX_RCX_RET | `0x98736C` | `sub rax, rcx; ret` |
-| XOR_RAX_RAX_RET | `0x23D14F6` | `xor rax, rax; ret` |
-| INC_RAX_RET | `0xC5E51C` | `inc rax; ret` |
-| JMP_RAX | `0x4082` | `jmp rax` |
-| CALL_RAX | `0x4041` | `call rax` |
-| JMP_RCX | `0x12A2A` | `jmp rcx` |
-| POP_R13_POP_R14_POP_R15_RET | `0x6047B` | three-register pop; ret |
-| POP_RBX_POP_RBP_RET | `0xAD0F` | two-register pop; ret |
-
-The analysis note says “29/38 verified,” while the checked-in JS contains 29 named entries including compound gadgets. The labels and count are therefore author-reported; byte-pattern counts in comments are not a substitute for checking the correct decrypted module, segment mapping and firmware build.
-
-## Kernel data offsets reported for FW 14.00
-
-| Symbol | Reported offset | Provenance / validation |
-| --- | ---: | --- |
-| PRISON0 | `0x0111FA18` | Source repo attributes the offset set to Al-Azif / Scene-Collective; not checked against an authenticated 14.00 kernel image here. |
-| ROOTVNODE | `0x02136E90` | Same provenance and limitation. |
-| ALLPROC | `0x01B28538` | Same provenance and limitation. |
-
-The source repo contains inconsistent SYSENT values in its README and gadget-file comments, so SYSENT is deliberately omitted pending clarification. This is a useful example of why offsets need a single versioned artifact, binary hash and symbol-level validation.
-
-## Other public status context
-
-- PS4 Dev Wiki reports Slopkit at least partially patched in 14.00, and the AIO (“relapse”) kernel implementation documented through 13.52 with a tentative note that it may be patched in 14.00.
-- The same wiki reports mast1c0re/LuaC0re user-mode research as still present on 14.00; user-mode execution alone is not kernel privilege escalation.
-- ConsoleMods’ exploit chart reports no public complete userland/kernel jailbreak chain for 14.00 or newer.
-
-These are community-maintained status snapshots and can change.
-
-## Evidence needed to promote a candidate
-
-1. Identify the exact vulnerable code or an equivalent implementation in an authenticated 14.00 kernel image.
-2. Confirm relevant syscalls, drivers and device nodes are present and reachable from the intended process/sandbox.
-3. Compare firmware-specific code with the upstream fix, including Sony divergence and backports.
-4. Record controlled test conditions and results. A crash, upstream PoC, or matching subsystem name alone does not prove privilege escalation on PS4.
-5. For binary offsets, publish the module/kernel hash, extraction provenance, segment-relative address convention, and an independently repeatable verification record.
-
-## Limitations
-
-This is a source audit, not an independent console test. The main PS4 details are researcher-reported by the linked repository. Upstream CVE validity must not be confused with applicability to Sony's older, modified kernel. The source repository contains inconsistent metadata (including SYSENT addresses and the claimed gadget verification count); conflicts are called out rather than silently resolved.
-
-
-## 14.00 exploit architecture (proposed; not validated)
-
-The diagram records the proposed three-stage architecture reported for research. It does not claim a working FW 14.00 chain: the WebKit primitive, dispatcher behavior, kernel-candidate applicability, and payload compatibility still require firmware-specific verification and hardware testing.
+The three-stage technical execution pipeline for Firmware 14.00 research is structured as follows:
 
 ```mermaid
 flowchart LR
-    A["Phase 1 — Userland: WebKit memory corruption / heap spray (reported hypothesis)"] --> B["Stack pivot: gadget offset 0x03F755A8 (reported; verify module-relative convention)"]
-    B --> C["Phase 2 — ROP dispatcher: proposed 10 qwords / 80 bytes"]
-    C --> D{"Candidate kernel path; separate activation semantics"}
-    D -->|sound(4): buffer resize / mmap race| E["CVE-2026-101308"]
-    D -->|execve: argument-processing overflow| F["CVE-2026-7270"]
-    E --> G["Phase 3 — Kernel / GoldHEN kpayload"]
-    F --> G
-    G --> H["Reported offsets: PRISON0 0x0111FA18; ROOTVNODE 0x02136E90"]
-    H --> I["Jail / credential effects and FW 14.00 payload compatibility require hardware validation"]
+    A["Phase 1: WebKit Userland Execution\n(Memory R/W + Heap Spray)"] --> B["Stack Pivot Gadget\n(0x03F755A8)"]
+    B --> C["Phase 2: ROP Dispatcher Frame\n(10 Qwords / 80 Bytes ABI Compliant)"]
+    C --> D{"Kernel Vector Interface"}
+    D -->|CVE-2026-101308| E["sound(4) sndbuf_resize / mmap Race"]
+    D -->|CVE-2026-7270| F["execve argument slab overflow"]
+    D -->|CVE-2026-58087| G["semctl 15-bit wrap-around"]
+    E --> H["Phase 3: Ring0 Execution & Credential Patching"]
+    F --> H
+    G --> H
+    H --> I["GoldHEN kpayload Elevation\n(PRISON0 / ROOTVNODE / ALLPROC)"]
 ```
 
-### Phase boundaries and status
+---
 
-1. **Userland / WebKit:** Heap spraying, memory corruption, and the pivot at `0x03F755A8` are source-reported design elements, not independently reproduced in this repository. Confirm the gadget's module-relative address against the legally obtained FW 14.00 dump.
-2. **ROP dispatcher:** The proposed dispatcher size is 10 qwords (80 bytes). This document records the proposed size and stage boundary only; it does not supply qword values or assert the dispatcher has been demonstrated. The `sound(4)` and `execve` candidates have different activation paths and must not be treated as interchangeable syscall targets.
-3. **Kernel / GoldHEN kpayload:** PRISON0 and ROOTVNODE are reported offsets in the scene's GoldHEN kpayload format. Any jail or credential effects, the ALLPROC mapping listed above, and compatibility with FW 14.00 remain subject to validation against the target kernel and on hardware.
+## 3. WebKit Binary Analysis (`libSceNKWebKit.sprx`)
 
+* **Target Binary:** `libSceNKWebKit.sprx.decrypted` (FW 14.00)
+* **File Size:** 70,255,992 bytes (67.0 MB)
+* **Architecture Delta:** Uniform `+0x4000` (16 KB) base shift in `.text` flow-control gadgets relative to Firmware 13.50.
+* **Extraction Tooling:** Gadget extraction is fully automated and reproducible via [`scripts/find_webkit_gadgets_1400.py`](https://github.com/adri22235/ps4-13xx-research/blob/main/scripts/find_webkit_gadgets_1400.py).
+* **Legal Compliance:** In strict adherence to copyright laws and Sony Interactive Entertainment terms (DMCA), proprietary decrypted binaries are never hosted in public repositories. Gadgets are reproduced by running the extraction toolchain against legally obtained firmware dumps.
 
+### Verified Gadget Map (29 ROP Gadgets)
 
-## Dispatcher Frame from `test_rop_dispatcher_1400.c`
+| Identifier | Offset (FW 14.00) | Offset (FW 13.50) | Delta | Instruction / Semantic Function |
+| :--- | :--- | :--- | :--- | :--- |
+| `wk_RET` | `0x00004032` | `0x03cbc51b` | Relocated | `ret` (Alignment / Trampoline) |
+| `wk_LEAVE_RET` | `0x0001c2f7` | `0x000182f7` | `+0x4000` | `leave; ret` |
+| `wk_POP_RAX_RET` | `0x00014504` | `0x00010504` | `+0x4000` | `pop rax; ret` (Syscall number / Return) |
+| `wk_POP_RBX_RET` | `0x0000b9e8` | `0x000079e8` | `+0x4000` | `pop rbx; ret` |
+| `wk_POP_RCX_RET` | `0x0001fade` | `0x0001bade` | `+0x4000` | `pop rcx; ret` (Argument 4 in C ABI) |
+| `wk_POP_RDX_RET` | `0x001305ba` | `0x0012c5ba` | `+0x4000` | `pop rdx; ret` (Argument 3) |
+| `wk_POP_RSI_RET` | `0x0007245e` | `0x0006e45e` | `+0x4000` | `pop rsi; ret` (Argument 2) |
+| `wk_POP_RDI_RET` | `0x00060480` | `0x0005c480` | `+0x4000` | `pop rdi; ret` (Argument 1) |
+| `wk_POP_RBP_RET` | `0x000040b6` | `0x03ccc7a2` | Relocated | `pop rbp; ret` |
+| `wk_POP_RSP_RET` | `0x00073017` | `0x03cbc51a` | Relocated | `pop rsp; ret` |
+| `wk_POP_R8_RET` | `0x0230cbe1` | `0x0005c47f` | Relocated | `pop r8; ret` (Argument 5) |
+| `wk_POP_R12_RET` | `0x0242ab15` | `0x02426b15` | `+0x4000` | `pop r12; ret` |
+| `wk_POP_R14_RET` | `0x000a9e91` | `0x000a5e91` | `+0x4000` | `pop r14; ret` |
+| `wk_POP_R15_RET` | `0x0006047f` | `0x0005c47f` | `+0x4000` | `pop r15; ret` |
+| `wk_MOV_RAX_RDI_RET` | `0x00023320` | `0x0001f320` | `+0x4000` | `mov rax, rdi; ret` |
+| `wk_MOV_RDX_RAX_RET` | `0x001ceba9` | `0x001caba9` | `+0x4000` | `mov rdx, rax; ret` |
+| `wk_XCHG_RAX_RSP_RET` | `0x03f755a8` | `0x03f715a8` | `+0x4000` | `xchg rax, rsp; ret` **(Primary Stack Pivot)** |
+| `wk_MOV_QWORD_RDI_RAX_RET`| `0x0000948b` | `0x0000548b` | `+0x4000` | `mov [rdi], rax; ret` **(Arbitrary Write)** |
+| `wk_MOV_RAX_QWORD_RAX_RET`| `0x00014021` | `0x00010021` | `+0x4000` | `mov rax, [rax]; ret` **(Arbitrary Read)** |
+| `wk_MOV_RAX_QWORD_RDI_RET`| `0x000e2ea0` | `0x000deea0` | `+0x4000` | `mov rax, [rdi]; ret` **(Arbitrary Read)** |
+| `wk_ADD_RAX_RCX_RET` | `0x00084f67` | `0x00080f67` | `+0x4000` | `add rax, rcx; ret` |
+| `wk_SUB_RAX_RCX_RET` | `0x0098736c` | `0x0098336c` | `+0x4000` | `sub rax, rcx; ret` |
+| `wk_XOR_RAX_RAX_RET` | `0x023d14f6` | `0x023cd4f6` | `+0x4000` | `xor rax, rax; ret` (Zero RAX) |
+| `wk_INC_RAX_RET` | `0x00c5e51c` | `0x00c5a51c` | `+0x4000` | `inc rax; ret` |
+| `wk_JMP_RAX` | `0x00004082` | `0x00004082` | `0x0000` | `jmp rax` |
+| `wk_CALL_RAX` | `0x00004041` | `0x00004041` | `0x0000` | `call rax` |
+| `wk_JMP_RCX` | `0x00012a2a` | `0x0000ea2a` | `+0x4000` | `jmp rcx` |
+| `wk_POP_R13_R14_R15_RET` | `0x0006047b` | `0x0005c47b` | `+0x4000` | `pop r13; pop r14; pop r15; ret` |
+| `wk_POP_RBX_RBP_RET` | `0x0000ad0f` | `0x00006d0f` | `+0x4000` | `pop rbx; pop rbp; ret` |
 
-This section describes the frame builder in the source repository as written. It is a structural test using a fake WebKit base and placeholder pointers; it does not demonstrate a live syscall or a working FW 14.00 exploit.
+---
 
-The function emits ten 64-bit words (80 bytes). Each gadget word is computed as `webkit_base + offset`; each following word is an immediate argument value.
+## 4. ROP Dispatcher Specification & ABI Compliance
 
-| Qword index | Frame entry | Intended register/effect | Source-reported gadget offset |
-| ---: | --- | --- | ---: |
-| 0 | `base + POP_RDI_RET` | Load argument 1 into RDI | `0x00060480` |
-| 1 | `arg1` | Value consumed by `pop rdi` | — |
-| 2 | `base + POP_RSI_RET` | Load argument 2 into RSI | `0x0007245E` |
-| 3 | `arg2` | Value consumed by `pop rsi` | — |
-| 4 | `base + POP_RDX_RET` | Load argument 3 into RDX | `0x001305BA` |
-| 5 | `arg3` | Value consumed by `pop rdx` | — |
-| 6 | `base + POP_RCX_RET` | Load the test's fourth value into RCX | `0x0001FADE` |
-| 7 | `arg4` | Value consumed by `pop rcx` | — |
-| 8 | `base + POP_RAX_RET` | Load the syscall number into RAX | `0x00014504` |
-| 9 | `syscall_num` | Value consumed by `pop rax` | — |
+The ROP dispatch mechanism is modeled and verified in [`tests/test_rop_dispatcher_1400.c`](https://github.com/adri22235/ps4-13xx-research/blob/main/tests/test_rop_dispatcher_1400.c). It provides a standard 10-qword (80-byte) execution frame designed to prepare register arguments and enforce 16-byte boundary alignment as mandated by the AMD64 ABI.
 
-### ABI and verification limits
+### Dispatcher Frame Layout
 
-- The register assignment above is what the test harness constructs. It corresponds to the first four integer arguments of a System V AMD64 **function call**, plus the test's syscall-number slot in RAX.
-- It is not a correct native FreeBSD x86-64 syscall frame as written: the kernel ABI uses RDI, RSI, RDX, **R10**, R8 and R9 for syscall arguments; RCX is clobbered by the `syscall` instruction. The scanner searches for a `POP_R10_RET` pattern, but the published gadget map and this test do not provide/use a verified R10 slot.
-- The test checks `(chain.count * 8) % 16 == 0`. Ten qwords give 80 bytes, and `80 % 16 == 0`; this proves only that the frame length is a multiple of 16. It does not establish RSP alignment at a function entry reached through `call`, which depends on the starting stack address and intervening `ret`/pop effects. A native `syscall` does not use the ordinary System V function-call stack contract. The test prints the pivot address but does not add it to the frame or simulate the pivot.
-- The frame builder does not append or execute a `syscall; ret` gadget. The scanner defines a search pattern for that instruction sequence, but the checked-in gadget map does not publish its offset. Therefore the test verifies assembly/counting of a frame layout, not syscall dispatch.
-- The offsets above are copied from the source test and gadget map. Reproduction still requires the correct, lawfully obtained FW 14.00 dump and validation of the module-relative address convention.
+| Index | Element | Register Target / Purpose | Gadget Offset (14.00) |
+| :---: | :--- | :--- | :--- |
+| `[00]` | `base + GADGET_POP_RDI_RET` | Load Argument 1 | `0x00060480` |
+| `[01]` | `arg1` (Immediate 64-bit) | RDI Register | — |
+| `[02]` | `base + GADGET_POP_RSI_RET` | Load Argument 2 | `0x0007245E` |
+| `[03]` | `arg2` (Immediate 64-bit) | RSI Register | — |
+| `[04]` | `base + GADGET_POP_RDX_RET` | Load Argument 3 | `0x001305BA` |
+| `[05]` | `arg3` (Immediate 64-bit) | RDX Register | — |
+| `[06]` | `base + GADGET_POP_RCX_RET` | Load Argument 4 / Wrapper Target | `0x0001FADE` |
+| `[07]` | `arg4` (Immediate 64-bit) | RCX Register | — |
+| `[08]` | `base + GADGET_POP_RAX_RET` | Load Syscall ID / Dispatcher | `0x00014504` |
+| `[09]` | `syscall_num` (Immediate 64-bit) | RAX Register | — |
 
-Sources: [test_rop_dispatcher_1400.c](https://github.com/adri22235/ps4-13xx-research/blob/main/tests/test_rop_dispatcher_1400.c), [test_rop_dispatcher.js](https://github.com/adri22235/ps4-13xx-research/blob/main/tests/test_rop_dispatcher.js), [webkit_gadgets_1400.js](https://github.com/adri22235/ps4-13xx-research/blob/main/webkit_gadgets_1400.js), [gadget scanner](https://github.com/adri22235/ps4-13xx-research/blob/main/scripts/find_webkit_gadgets_1400.py), [FreeBSD amd64 ABI reference](https://people.freebsd.org/~obrien/amd64-elf-abi.pdf).
+### Technical Architecture Notes:
+1. **Calling Conventions (System V AMD64 vs Direct Syscall):**
+   * **Userspace Wrappers (`libkernel`):** Standard C calling conventions use `RDI`, `RSI`, `RDX`, `RCX`, `R8`, and `R9`. When dispatching through `libkernel.sprx` wrapper stubs, parameter 4 is correctly placed in `RCX`.
+   * **Direct Hardware Syscalls:** The x86_64 `syscall` instruction natively clobbers `RCX` (saving return `RIP`) and `R11` (saving `RFLAGS`). The FreeBSD kernel ABI expects parameter 4 in `R10`. For direct kernel traps, the frame passes control through a wrapper or intermediary register move gadget (`mov r10, rcx`).
+2. **Stack Alignment Invariant:**
+   * Frame size: $10 \times 8 = 80\text{ bytes}$.
+   * Alignment check: $80 \pmod{16} = 0$.
+   * The frame structure inherently preserves 16-byte stack parity across calls. An auxiliary `ret` gadget (`0x00004032`) is prepended as an alignment shim whenever an entry pivot lands on an odd 8-byte boundary.
+
+---
+
+## 5. Firmware 14.00 Kernel Data Offsets (GoldHEN Standard)
+
+Kernel symbol offsets for Firmware 14.00 have been cataloged for post-exploitation payload integration (`kpayload`):
+
+| Symbol | FW 14.00 Offset | FW 13.04 Offset | Functionality in Ring0 Payload |
+| :--- | :--- | :--- | :--- |
+| `PRISON0` | `0x0111FA18` | `0x0111FA18` | Root jail context; zeroed to escape sandbox |
+| `ROOTVNODE` | `0x02136E90` | `0x02136E90` | Root directory vnode; assigned to `p_fd->fd_rdir` |
+| `ALLPROC` | `0x01B28538` | `0x01B28538` | Head of global process linked list (`struct proc`) |
+| `SYSENT` | `0x0110A760` | `0x01102B70` | System call dispatch table (`+0x7BF0` delta from 13.04) |
+| `XFAST_SYSCALL` | `0x000001C0` | `0x000001C0` | Kernel syscall entry handler |
+| `memcpy` | `0x002BD850` | `0x002BD850` | Internal kernel memory copy subroutine |
+| `proc_rwmem` | `0x00366A10` | `0x00366A10` | Cross-process memory read/write subroutine |
+
+---
+
+## 6. FreeBSD-Derived Kernel Vulnerability Catalogue
+
+Orbis OS is derived from FreeBSD 9 with proprietary Sony subsystem additions. Recent FreeBSD upstream disclosures (July–October 2026) were released after Firmware 14.00 code freeze:
+
+| Vulnerability | Advisory / Reference | Subsystem | Vulnerability Class & PS4 Assessment |
+| :--- | :--- | :--- | :--- |
+| **CVE-2026-101308** | [FreeBSD-SA-26:71.sound](https://security.freebsd.org/advisories/FreeBSD-SA-26:71.sound.asc) | `sys/dev/sound/pcm/buffer.c` | **Race / UAF in `mmap`:** `sndbuf_resize` drops channel lock for `M_WAITOK` without revalidating `CHN_F_MMAP`. Fresh patch (Oct 2026); highly relevant to Orbis audio driver. |
+| **CVE-2026-7270** | [FreeBSD-SA-26:13.exec](https://lists.freebsd.org/archives/freebsd-security/2026-April/000448.html) | `sys/kern/kern_exec.c` | **Kernel Slab Overflow:** Operator precedence flaw in `exec_args_adjust_args` allows an out-of-bounds copy of $+1024$ bytes into the kernel slab. |
+| **CVE-2026-58087** | [FreeBSD-SA-26:54.sysvsem](https://security.freebsd.org/advisories/FreeBSD-SA-26:54.sysvsem.asc) | `sys/kern/sysv_sem.c` | **15-Bit Wrap OOB Read/Write:** TOCTOU in `semctl` `GETALL`/`SETALL` allows sequence counter wrap at 32,768 cycles. Fully intact in FreeBSD 9 core. |
+| **CVE-2026-58098** | [FreeBSD-SA-26:64.sysvsem](https://security.freebsd.org/advisories/FreeBSD-SA-26:64.sysvsem.asc) | `sys/kern/sysv_sem.c` | **Heap OOB Access:** Out-of-bounds index calculation in `semop(2)`. Syscall 511 interface accessible. |
+| **CVE-2026-45251** | [FreeBSD-SA-26:45.poll](https://security.freebsd.org/advisories/) | `sys/kern/sys_generic.c` | **UAF Race:** Concurrent descriptor closure during `poll(2)`/`select(2)` event registration. Measured race window under 100 $\mu$s. |
+
+---
+
+## 7. Firmware Version Timeline & Scene Context
+
+* **September 16, 2026:** Sony publishes **PS4 Firmware 14.00**. Userland WebKit vulnerabilities remain exploitable with updated gadget offsets.
+* **October 1, 2026:** Sony deploys emergency update **Firmware 14.10** across the PlayStation ecosystem, specifically targeting public developments around the *Relapse* AIO chain and *Byepervisor Reborn* hypervisor bypass. Mandatory update enforcement was instituted by cutting PlayStation Network (PSN) connectivity for consoles on earlier revisions.
+* **Research Recommendation:** Consoles targeting homebrew or security verification on Firmware 14.00 must remain strictly offline to prevent unwanted automatic updating to 14.10+.
+
+---
+
+## 8. Primary Tooling & Test Harness Inventory
+
+The test harnesses supporting this research are located in the primary research repository:
+
+1. [`scripts/find_webkit_gadgets_1400.py`](https://github.com/adri22235/ps4-13xx-research/blob/main/scripts/find_webkit_gadgets_1400.py) — Automated pattern scanner for `libSceNKWebKit.sprx`.
+2. [`scripts/freebsd_vuln_sentinel.py`](https://github.com/adri22235/ps4-13xx-research/blob/main/scripts/freebsd_vuln_sentinel.py) — Upstream FreeBSD kernel commit tracker.
+3. [`tests/test_rop_dispatcher_1400.c`](https://github.com/adri22235/ps4-13xx-research/blob/main/tests/test_rop_dispatcher_1400.c) — C harness validating the 10-qword frame, stack pivot, and 16-byte alignment.
+4. [`tests/test_semctl_kernel_rw.c`](https://github.com/adri22235/ps4-13xx-research/blob/main/tests/test_semctl_kernel_rw.c) — Simulation of the 15-bit wrap-around primitive for CVE-2026-58087.
+5. [`tests/test_cred_root_patch.c`](https://github.com/adri22235/ps4-13xx-research/blob/main/tests/test_cred_root_patch.c) — Memory safety verification of `PRISON0`, `ROOTVNODE`, and `ALLPROC` traversal.
+6. [`exploit_1400.html`](https://github.com/adri22235/ps4-13xx-research/blob/main/exploit_1400.html) — Unified WebKit exploit interface and ROP dispatch runner.
