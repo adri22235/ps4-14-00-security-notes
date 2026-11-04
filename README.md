@@ -20,7 +20,9 @@ Primary Codebase: [adri22235/ps4-13xx-research](https://github.com/adri22235/ps4
 | **Sandbox Confinement** | **Active (AF_UNIX Restricted)** | WebKit execution is confined to browser sandbox; non-`AF_UNIX` network sockets restricted in 14.00. |
 | **Kernel Candidates (KEX)** | **Active Investigation** | Celsius patched in 14.00. Priority focus on unpatched FreeBSD upstream vectors: **CVE-2026-101308** (`sound(4)` TOCTOU in `mmap`) and **CVE-2026-7270** (`execve` slab overflow). |
 | **Kernel Symbol Offsets** | **Cataloged (GoldHEN Standard)** | `PRISON0` (`0x0111FA18`), `ROOTVNODE` (`0x02136E90`), `ALLPROC` (`0x01B28538`), `SYSENT` (`0x0110A760`). |
-| **Upstream Alert (14.02)** | **CRITICAL: DO NOT UPDATE** | Sony released reactive patch **FW 14.02** on Nov 4, 2026 to mitigate WebKit/APM vectors. Keep 14.00 and 13.04 offline. |
+| **Firmware Sanctuary (13.04)** | **Protected & Inalterable** | Lead researcher reference unit strictly preserved on FW 13.04 with GoldHEN v2.4b18.12 offline. |
+| **DNS Blocker (14.00 Units)** | **MANDATORY: 62.210.38.117** | Test and audit units on FW 14.00 must enforce Primary/Secondary DNS `62.210.38.117` (Al-Azif blocker) to prevent forced updates to 14.02/14.10+. |
+| **Upstream Alert (14.02)** | **CRITICAL: DO NOT UPDATE** | Sony released reactive patch **FW 14.02** on Nov 4, 2026 to mitigate WebKit/APM vectors. Keep 14.00 on DNS block and 13.04 in offline isolation. |
 
 ---
 
