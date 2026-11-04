@@ -165,3 +165,4 @@ The test harnesses supporting this research are located in the primary research 
 4. [`tests/test_semctl_kernel_rw.c`](https://github.com/adri22235/ps4-13xx-research/blob/main/tests/test_semctl_kernel_rw.c) — Simulation of the 15-bit wrap-around primitive for CVE-2026-58087.
 5. [`tests/test_cred_root_patch.c`](https://github.com/adri22235/ps4-13xx-research/blob/main/tests/test_cred_root_patch.c) — Memory safety verification of `PRISON0`, `ROOTVNODE`, and `ALLPROC` traversal.
 6. [`exploit_1400.html`](https://github.com/adri22235/ps4-13xx-research/blob/main/exploit_1400.html) — Unified WebKit exploit interface and ROP dispatch runner.
+7. [`exploit_1402.html`](exploit_1402.html) — Differential audit suite and WebKit mitigation analyzer for FW 14.02.

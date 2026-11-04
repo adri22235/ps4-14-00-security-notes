@@ -28,6 +28,7 @@ Primary Codebase: [adri22235/ps4-13xx-research](https://github.com/adri22235/ps4
 
 * [**Technical Research Notes (`RESEARCH.md`)**](RESEARCH.md) — Comprehensive technical dossier containing the 3-phase exploit architecture diagram, the complete 29 WebKit gadget table, ROP dispatcher specifications, ABI parameter passing notes (`RCX` vs `R10`), and the FreeBSD kernel vulnerability catalogue.
 * [**Interactive WebKit Harness (`exploit_1400.html`)**](exploit_1400.html) — Interactive browser-based WebKit ROP and memory safety testing harness for FW 14.00.
+* [**Mitigation Audit Suite (`exploit_1402.html`)**](exploit_1402.html) — Differential audit suite and WebKit mitigation analyzer for Sony's reactive FW 14.02 patch.
 * [**Primary Research Repository (`ps4-13xx-research`)**](https://github.com/adri22235/ps4-13xx-research) — Full repository containing gadget scanners, automated Python sentinels, and C verification harnesses.
 * [**Sources and Claim Map (`SOURCES.md`)**](SOURCES.md) — Primary references, FreeBSD security advisories, and community trackers.
 
