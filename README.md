@@ -20,6 +20,7 @@ Primary Codebase: [adri22235/ps4-13xx-research](https://github.com/adri22235/ps4
 | **Sandbox Confinement** | **Active (AF_UNIX Restricted)** | WebKit execution is confined to browser sandbox; non-`AF_UNIX` network sockets restricted in 14.00. |
 | **Kernel Candidates (KEX)** | **Active Investigation** | Celsius patched in 14.00. Priority focus on unpatched FreeBSD upstream vectors: **CVE-2026-101308** (`sound(4)` TOCTOU in `mmap`) and **CVE-2026-7270** (`execve` slab overflow). |
 | **Kernel Symbol Offsets** | **Cataloged (GoldHEN Standard)** | `PRISON0` (`0x0111FA18`), `ROOTVNODE` (`0x02136E90`), `ALLPROC` (`0x01B28538`), `SYSENT` (`0x0110A760`). |
+| **Upstream Alert (14.02)** | **CRITICAL: DO NOT UPDATE** | Sony released reactive patch **FW 14.02** on Nov 4, 2026 to mitigate WebKit/APM vectors. Keep 14.00 and 13.04 offline. |
 
 ---
 
